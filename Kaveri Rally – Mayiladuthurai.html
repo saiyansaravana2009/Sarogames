@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kaveri Rally – Mayiladuthurai</title>
+<link href="https://fonts.googleapis.com/css2?family=Mukta+Malar:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e6ede0;--card:#fffdf4;--ink:#14213d;--mute:#44506a;--gold:#f5b301;--kum:#b5121b;--sea:#0b6e8a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1424;--card:#16243d;--ink:#f4efdc;--mute:#b8c2d4}}
+:root[data-theme="dark"]{--bg:#0b1424;--card:#16243d;--ink:#f4efdc;--mute:#b8c2d4}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+body{margin:0;height:100%;background:var(--bg);display:grid;place-items:center;font-family:"Mukta Malar",system-ui,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+#wrap{position:relative;width:min(100vw,calc((100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))*.625));aspect-ratio:5/8;background:#000;overflow:hidden}
+canvas{width:100%;height:100%;display:block}
+#hud{position:absolute;top:8px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-start;color:#fff;font-weight:800;font-size:17px;text-shadow:0 1px 3px #000;pointer-events:none}
+#hud small{display:block;font-weight:500;font-size:12px;opacity:.9}
+#dots{display:flex;gap:5px;padding-top:6px}
+#dots span{width:10px;height:10px;border-radius:50%;border:2px solid #fff;background:transparent}
+#dots span.on{background:var(--gold);border-color:var(--gold)}
+#bn{position:absolute;left:10px;right:10px;top:54px;background:rgba(12,22,40,.88);color:#fff;padding:9px 12px;border-left:5px solid var(--gold);border-radius:10px;transform:translateY(-160%);transition:transform .4s;pointer-events:none;font-size:14px;line-height:1.35}
+#bn.show{transform:none}
+#bn b{font-size:18px}#bn i{font-style:normal;color:var(--gold);margin-left:6px}#bn p{margin:3px 0 0}#bn em{font-style:normal;color:#9be28a;font-weight:700}
+#ctl{position:absolute;left:0;right:0;bottom:10px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 12px;pointer-events:none}
+#ctl button{pointer-events:auto;touch-action:none;width:84px;height:84px;border-radius:50%;border:3px solid rgba(255,255,255,.8);background:rgba(10,20,36,.5);color:#fff;font:800 30px "Mukta Malar",sans-serif}
+#ctl #bb{width:64px;height:64px;font-size:14px;background:rgba(181,18,27,.65)}
+#ctl button:active,#ctl button.d{background:rgba(245,179,1,.75);color:#14213d}
+.ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(8,16,30,.78)}
+.card{background:var(--card);color:var(--ink);border-radius:18px;padding:20px 20px 18px;max-width:330px;width:100%;border-top:8px solid var(--sea)}
+.card h1,.card h2{margin:0;font-size:30px;line-height:1.05;font-weight:800}
+.card .ta{color:var(--kum);font-weight:700;font-size:18px;margin:2px 0 10px}
+.card p{margin:0 0 12px;color:var(--mute);font-size:15px;line-height:1.45}
+.card ul{margin:0 0 12px;padding-left:18px;font-size:15px;line-height:1.5}
+.card li span{color:var(--kum);margin-left:6px}
+.card button{width:100%;padding:13px;border:0;border-radius:12px;background:var(--sea);color:#fff;font:800 18px "Mukta Malar",sans-serif}
+.card button:focus-visible,#ctl button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){#bn{transition:none}}
+</style>
+</head>
+<body>
+<div id="wrap">
+<canvas id="c" width="400" height="640"></canvas>
+<div id="hud"><div><span id="sc">0</span><small id="sp">0 km/h</small></div><div id="dots"></div><div style="text-align:right"><span id="tm">40</span><small>seconds</small></div></div>
+<div id="bn"></div>
+<div id="ctl"><button id="bl" aria-label="Steer left">◀</button><button id="bb" aria-label="Brake">Brake</button><button id="br" aria-label="Steer right">▶</button></div>
+<div class="ov" id="intro"><div class="card">
+<h1>Kaveri Rally</h1><div class="ta">காவிரி பந்தயம்</div>
+<p>Drive through six stops of Mayiladuthurai district, from the temple town to the Poompuhar coast. Dodge bullock carts, autos and buses, collect jasmine, and reach each place before time runs out.</p>
+<p>Hold ◀ and ▶ to steer. Tap Brake to slow down. Each new place adds 30 seconds.</p>
+<button id="go">Start the race</button></div></div>
+<div class="ov" id="end" style="display:none"><div class="card">
+<h2 id="et"></h2><div class="ta" id="es"></div>
+<p>Places you reached:</p><ul id="el"></ul>
+<button id="again">Race again</button></div></div>
+</div>
+<script>
+const $=i=>document.getElementById(i);
+const C=$("c"),g=C.getContext("2d"),W=400,H=640,HY=290;
+const SEG=200,RW=900,CH=1000,DEP=.84,PZ=CH*DEP,DRAW=100,PER=1800,MAXS=12000;
+const ST=[
+{n:"Mayiladuthurai",t:"மயிலாடுதுறை",f:"The name recalls the peacock (mayil). Mayuranathaswamy temple hosts the Kaveri Tula Snanam, an autumn holy dip.",sk:["#ff9e5e","#ffe3a8"],gr:["#5fae34","#54a02c"],rd:["#585a60","#62646a"],si:"#7a6a52",ty:"t"},
+{n:"Vaitheeswaran Koil",t:"வைத்தீஸ்வரன்கோயில்",f:"Shrine of Vaidyanathar, Shiva the healer, and a Navagraha site tied to Mars. Known for palm-leaf Nadi astrology.",sk:["#6fb7e8","#d8f0ff"],gr:["#7bc043","#6fb338"],rd:["#55575d","#5f6167"],si:"#5d7a6a",ty:"t"},
+{n:"Thirukkadaiyur",t:"திருக்கடையூர்",f:"Amirthaghateswarar temple, where Shiva is said to have saved the boy Markandeya. Couples come to mark milestone birthdays.",sk:["#4aa3df","#bfe6ff"],gr:["#4f9d2f","#448f27"],rd:["#585a60","#62646a"],si:"#4d6d5a",ty:"t"},
+{n:"Sirkazhi",t:"சீர்காழி",f:"Birthplace of the child saint Thirugnana Sambandar. The Tamil Isai Moovar, early masters of Tamil music, are linked to this town.",sk:["#f2a33c","#ffe6a0"],gr:["#c4b43e","#b8a838"],rd:["#5a5750","#64615a"],si:"#7a6240",ty:"t"},
+{n:"Tharangambadi",t:"தரங்கம்பாடி",f:"Tranquebar, the town of the singing waves. The Danes raised Fort Dansborg here in 1620 on the Bay of Bengal.",sk:["#e98a6b","#ffd9b0"],gr:["#d2bd85","#c7b17a"],rd:["#5e5a55","#686460"],si:"#8a4f3d",ty:"f"},
+{n:"Poompuhar",t:"பூம்புகார்",f:"Ancient Chola port Kaveripoompattinam, setting of the epic Silappathikaram, the tale of Kannagi and Kovalan.",sk:["#2b2f6b","#f08a5d"],gr:["#e3cf9a","#d8c28b"],rd:["#5a5a60","#64646a"],si:"#0f5b78",ty:"s"}
+];
+const N=ST.length*PER,seg=[],T=[];
+const rnd=(()=>{let s=7;return()=>(s=(s*16807)%2147483647)/2147483647})();
+for(let i=0;i<N;i++){const e=Math.min(1,i/400);seg.push({c:(Math.sin(i/95)*1.4+Math.sin(i/41+1)*.8)*e,sp:[]})}
+for(let i=30;i<N;i++){const st=(i/PER)|0,l=i%PER;
+ if(i%5===0)seg[i].sp.push({k:"p",o:1.35+rnd()*1.2});
+ if(i%5===2)seg[i].sp.push({k:"p",o:-(1.35+rnd()*1.2)});
+ if(l===40)seg[i].sp.push({k:"g",o:2.6,st},{k:"g",o:-2.6,st},{k:"s",o:1.95,st});}
+for(let j=300;j<N-30;j+=140){const ln=[-.6,0,.6][Math.floor(rnd()*3)];for(let q=0;q<6;q++)seg[j+q*3].sp.push({k:"f",o:ln,got:0})}
+for(let z=3000;z<N*SEG-5000;z+=SEG*(26+Math.floor(rnd()*30))){const ty=Math.floor(rnd()*3);T.push({z,h:z,x:[-.6,0,.6][Math.floor(rnd()*3)],ty,v:[1800,3800,5500][ty]*(.9+rnd()*.2)})}
+
+let pos,px,sp,sc,tm,fl,inv,shake,bgx,reached,seen,run=false,last=0,kl=0,kr=0,kb=0,bt;
+const dots=[];for(let i=0;i<6;i++){const d=document.createElement("span");$("dots").appendChild(d);dots.push(d)}
+function reset(){pos=0;px=0;sp=0;sc=0;tm=40;fl=0;inv=0;shake=0;bgx=0;reached=[];seen={};
+ T.forEach(c=>c.z=c.h);seg.forEach(s=>s.sp.forEach(o=>{if(o.k==="f")o.got=0}));dots.forEach(d=>d.classList.remove("on"));$("bn").classList.remove("show")}
+reset();
+function start(){reset();$("intro").style.display="none";$("end").style.display="none";run=true;last=performance.now()}
+$("go").onclick=start;$("again").onclick=start;
+
+function banner(st,bonus){const S=ST[st];clearTimeout(bt);
+ $("bn").innerHTML="<b>"+S.n+"</b><i>"+S.t+"</i><p>"+S.f+(bonus?" <em>+30 seconds</em>":"")+"</p>";
+ $("bn").classList.add("show");bt=setTimeout(()=>$("bn").classList.remove("show"),7000)}
+function finish(win){run=false;
+ let best=0;try{best=+localStorage.getItem("kr_best")||0;if(sc>best){best=Math.floor(sc);localStorage.setItem("kr_best",best)}}catch(e){}
+ $("et").textContent=win?"You reached the sea!":"Time’s up";
+ $("es").textContent="Score "+Math.floor(sc)+". Jasmine "+fl+". Best "+Math.max(best,Math.floor(sc))+".";
+ $("el").innerHTML=reached.map(r=>"<li>"+ST[r].n+"<span>"+ST[r].t+"</span></li>").join("");
+ $("end").style.display="flex"}
+
+function update(dt){
+ const ps=Math.min(N-1,Math.floor((pos+PZ)/SEG)),s=seg[ps],spct=sp/MAXS,dir=kr-kl;
+ px+=dir*3*dt*Math.min(1,.35+spct);
+ px-=dt*2*spct*s.c*.3;
+ px=Math.max(-1.7,Math.min(1.7,px));
+ let mx=Math.abs(px)>1.05?3500:MAXS;
+ if(kb)sp-=14000*dt;else sp+=(sp<mx?5500:-8000)*dt;
+ sp=Math.max(0,Math.min(MAXS,sp));
+ pos+=sp*dt;sc+=sp*dt/100;tm-=dt;bgx-=s.c*spct*dt*70;
+ if(inv>0)inv-=dt;if(shake>0)shake-=dt;
+ const pz=pos+PZ;
+ for(const c of T){c.z+=c.v*dt;
+  if(inv<=0&&Math.abs(c.z-pz)<230&&Math.abs(c.x-px)<.32){sp=Math.min(sp,2500);inv=1.2;shake=.35;px+=(px>=c.x?1:-1)*.35;sc=Math.max(0,sc-100)}}
+ for(let j=Math.max(0,ps-1);j<=Math.min(N-1,ps+1);j++)for(const o of seg[j].sp)
+  if(o.k==="f"&&!o.got&&Math.abs(o.o-px)<.28){o.got=1;sc+=150;fl++}
+ const st=Math.floor(ps/PER);
+ if(ps%PER>=25&&!seen[st]){seen[st]=1;reached.push(st);dots[st].classList.add("on");if(st>0)tm+=30;banner(st,st>0)}
+ if(pz>=N*SEG-600)finish(true);else if(tm<=0){tm=0;finish(false)}
+}
+
+function quad(x1,y1,w1,x2,y2,w2,c){g.fillStyle=c;g.beginPath();g.moveTo(x1-w1,y1);g.lineTo(x2-w2,y2);g.lineTo(x2+w2,y2);g.lineTo(x1+w1,y1);g.closePath();g.fill()}
+function palm(X,Y,k){const h=1000*k;g.fillStyle="#6b4a2b";g.beginPath();g.moveTo(X-50*k,Y);g.lineTo(X+50*k,Y);g.lineTo(X+25*k,Y-h);g.lineTo(X-25*k,Y-h);g.fill();
+ g.strokeStyle="#2f7d32";g.lineWidth=Math.max(1,34*k);g.lineCap="round";
+ for(let a=-2;a<=2;a++){g.beginPath();g.moveTo(X,Y-h);g.quadraticCurveTo(X+a*170*k,Y-h-170*k,X+a*330*k,Y-h+(Math.abs(a)*110+30)*k);g.stroke()}}
+function gop(X,Y,k){const cols=["#e8d9b5","#b5121b","#e8d9b5","#c98a2b","#e8d9b5","#b5121b","#e8d9b5"];
+ g.fillStyle="#d9c9a0";g.fillRect(X-700*k,Y-260*k,1400*k,260*k);let h=260;
+ for(let t=0;t<7;t++){const w=620-t*75;g.fillStyle=cols[t];g.fillRect(X-w*k,Y-(h+170)*k,w*2*k,170*k);g.fillStyle="rgba(0,0,0,.25)";g.fillRect(X-w*k,Y-(h+30)*k,w*2*k,30*k);h+=170}
+ g.fillStyle="#f5b301";g.beginPath();g.arc(X,Y-(h+50)*k,55*k,0,7);g.fill()}
+function fort(X,Y,k){g.fillStyle="#b0452d";g.fillRect(X-600*k,Y-1500*k,1200*k,1500*k);
+ for(let q=0;q<5;q++)g.fillRect(X-600*k+q*260*k,Y-1650*k,140*k,150*k);
+ g.fillStyle="#f1e3c4";g.fillRect(X-600*k,Y-1100*k,1200*k,60*k);
+ g.fillStyle="#3a1b12";g.beginPath();g.arc(X,Y-420*k,220*k,Math.PI,0);g.lineTo(X+220*k,Y);g.lineTo(X-220*k,Y);g.fill()}
+function stele(X,Y,k){g.fillStyle="#a39a8a";g.fillRect(X-140*k,Y-2300*k,280*k,2300*k);g.fillStyle="#7e7567";g.fillRect(X-220*k,Y-160*k,440*k,160*k);
+ g.strokeStyle="#f5b301";g.lineWidth=Math.max(1,50*k);for(let q=0;q<3;q++){g.beginPath();g.arc(X,Y-1500*k-q*260*k,200*k,0,7);g.stroke()}}
+function sign(X,Y,k,st){g.fillStyle="#444";g.fillRect(X-380*k,Y-900*k,40*k,900*k);g.fillRect(X+340*k,Y-900*k,40*k,900*k);
+ g.fillStyle="#0b6e8a";g.fillRect(X-520*k,Y-1300*k,1040*k,440*k);g.fillStyle="#fff";g.textAlign="center";
+ g.font="800 "+Math.max(6,140*k)+"px 'Mukta Malar',sans-serif";g.fillText(ST[st].n,X,Y-1100*k);
+ g.font="700 "+Math.max(5,115*k)+"px 'Mukta Malar',sans-serif";g.fillText(ST[st].t,X,Y-950*k)}
+function flower(X,Y,k){g.fillStyle="#2f7d32";g.fillRect(X-110*k,Y-40*k,220*k,40*k);g.fillStyle="#fff";g.beginPath();g.arc(X,Y-100*k,95*k,0,7);g.fill();g.fillStyle="#f5b301";g.beginPath();g.arc(X,Y-100*k,32*k,0,7);g.fill()}
+function veh(X,Y,k,ty){
+ if(ty===0){g.fillStyle="#8b5a2b";g.fillRect(X-250*k,Y-420*k,500*k,260*k);g.fillStyle="#e3d09a";g.beginPath();g.moveTo(X-270*k,Y-420*k);g.quadraticCurveTo(X,Y-850*k,X+270*k,Y-420*k);g.fill();
+  g.fillStyle="#2b1d12";g.fillRect(X-330*k,Y-300*k,70*k,300*k);g.fillRect(X+260*k,Y-300*k,70*k,300*k)}
+ else if(ty===1){g.fillStyle="#f5c400";g.fillRect(X-200*k,Y-480*k,400*k,330*k);g.fillStyle="#1f6f3a";g.fillRect(X-225*k,Y-650*k,450*k,170*k);
+  g.fillStyle="#111";g.fillRect(X-70*k,Y-150*k,140*k,150*k);g.fillStyle="#e22";g.fillRect(X-180*k,Y-400*k,60*k,50*k);g.fillRect(X+120*k,Y-400*k,60*k,50*k)}
+ else{g.fillStyle="#1f7a4a";g.fillRect(X-290*k,Y-900*k,580*k,800*k);g.fillStyle="#f4efdc";g.fillRect(X-290*k,Y-500*k,580*k,60*k);
+  g.fillStyle="#16324a";g.fillRect(X-250*k,Y-840*k,500*k,260*k);g.fillStyle="#111";g.fillRect(X-290*k,Y-120*k,130*k,120*k);g.fillRect(X+160*k,Y-120*k,130*k,120*k);
+  g.fillStyle="#e22";g.fillRect(X-260*k,Y-400*k,70*k,60*k);g.fillRect(X+190*k,Y-400*k,70*k,60*k)}}
+function player(){if(inv>0&&Math.floor(inv*12)%2)return;
+ g.save();g.translate(W/2,H-92);g.rotate((kr-kl)*.05);
+ g.fillStyle="rgba(0,0,0,.35)";g.beginPath();g.ellipse(0,32,44,7,0,0,7);g.fill();
+ g.fillStyle="#111";g.fillRect(-41,8,14,24);g.fillRect(27,8,14,24);
+ g.fillStyle="#0b6e8a";g.beginPath();g.roundRect(-37,-8,74,38,9);g.fill();
+ g.fillStyle="#0a4f66";g.beginPath();g.roundRect(-27,-28,54,26,7);g.fill();
+ g.fillStyle="#9fd6e6";g.fillRect(-21,-24,42,14);
+ g.fillStyle="#1e9e5a";g.beginPath();g.ellipse(0,14,9,8,0,0,7);g.fill();g.fillStyle="#f5b301";g.beginPath();g.arc(0,14,5.5,0,7);g.fill();g.fillStyle="#0b3a8a";g.beginPath();g.arc(0,14,2.5,0,7);g.fill();
+ g.fillStyle="#ff3b30";g.fillRect(-35,2,12,6);g.fillRect(23,2,12,6);
+ g.restore()}
+function skyline(S){const o=((bgx%240)+240)%240;g.fillStyle=S.si;
+ if(S.ty==="s"){g.fillRect(0,HY-20,W,20);g.fillStyle="rgba(255,220,170,.5)";g.fillRect(150,HY-20,70,3);g.fillRect(160,HY-14,50,3);
+  g.fillStyle="#f4efdc";for(const b of [60,300]){g.beginPath();g.moveTo(b,HY-34);g.lineTo(b+16,HY-20);g.lineTo(b,HY-20);g.fill()}return}
+ for(let x=-240+o;x<W+240;x+=240){
+  if(S.ty==="t"){for(let t=0;t<5;t++){const w=34-t*6;g.fillRect(x-w,HY-8-(t+1)*10,w*2,10)}g.fillRect(x-44,HY-12,88,12);}
+  else{g.fillRect(x-70,HY-30,140,30);for(let q=0;q<7;q++)g.fillRect(x-70+q*20,HY-36,10,6);g.fillRect(x-86,HY-46,24,46);g.fillRect(x+62,HY-46,24,46)}
+  g.fillRect(x+100,HY-28,3,28);g.beginPath();g.arc(x+101,HY-28,11,Math.PI,0);g.fill()}}
+
+function render(){
+ const base=Math.floor(pos/SEG),bp=(pos%SEG)/SEG,ps=Math.min(N-1,Math.floor((pos+PZ)/SEG)),S=ST[Math.min(5,Math.floor(ps/PER))];
+ g.save();if(shake>0)g.translate((Math.random()-.5)*8,(Math.random()-.5)*8);
+ const gr=g.createLinearGradient(0,0,0,HY);gr.addColorStop(0,S.sk[0]);gr.addColorStop(1,S.sk[1]);g.fillStyle=gr;g.fillRect(0,0,W,HY+1);
+ g.fillStyle="rgba(255,246,208,.85)";g.beginPath();g.arc(290,HY-60,26,0,7);g.fill();
+ skyline(S);g.fillStyle=S.gr[0];g.fillRect(0,HY,W,H-HY);
+ let x=0,dx=-seg[base].c*bp;const P=[],cw=px*RW;
+ for(let n=0;n<DRAW&&base+n<N;n++){const i=base+n,s=seg[i],z1=i*SEG-pos,z2=z1+SEG;
+  if(z1>1){const a=DEP/z1,b=DEP/z2;P.push({i,a,b,X1:W/2+a*(x-cw)*W/2,Y1:HY+a*CH*H/2,w1:a*RW*W/2,X2:W/2+b*(x+dx-cw)*W/2,Y2:HY+b*CH*H/2,w2:b*RW*W/2})}
+  x+=dx;dx+=s.c}
+ const tmap={};for(const c of T){const j=Math.floor(c.z/SEG);(tmap[j]=tmap[j]||[]).push(c)}
+ for(let q=P.length-1;q>=0;q--){const p=P[q],i=p.i,SS=ST[Math.floor(i/PER)],alt=((i/3)|0)%2;
+  g.fillStyle=SS.gr[alt];g.fillRect(0,p.Y2,W,p.Y1-p.Y2+1);
+  quad(p.X1,p.Y1,p.w1*1.12,p.X2,p.Y2,p.w2*1.12,alt?"#f4efdc":"#b5121b");
+  quad(p.X1,p.Y1,p.w1,p.X2,p.Y2,p.w2,SS.rd[alt]);
+  if(!alt)for(const L of [-.33,.33])quad(p.X1+L*p.w1,p.Y1,p.w1*.02,p.X2+L*p.w2,p.Y2,p.w2*.02,"#f4efdc");
+  const k=p.a*W/2;
+  for(const o of seg[i].sp){const X=p.X1+o.o*p.w1;
+   if(o.k==="p")palm(X,p.Y1,k);else if(o.k==="g"){const ty=ST[o.st].ty;if(ty==="t")gop(X,p.Y1,k);else if(ty==="f")fort(X,p.Y1,k);else stele(X,p.Y1,k)}
+   else if(o.k==="s")sign(X,p.Y1,k,o.st);else if(o.k==="f"&&!o.got)flower(X,p.Y1,k)}
+  for(const c of tmap[i]||[]){const t=(c.z-i*SEG)/SEG,X=p.X1+(p.X2-p.X1)*t+c.x*(p.w1+(p.w2-p.w1)*t),Y=p.Y1+(p.Y2-p.Y1)*t,kk=(p.a+(p.b-p.a)*t)*W/2;veh(X,Y,kk,c.ty)}}
+ player();g.restore();
+ $("sc").textContent=Math.floor(sc);$("tm").textContent=Math.ceil(Math.max(0,tm));$("sp").textContent=Math.round(sp/MAXS*140)+" km/h";
+}
+function loop(t){const dt=Math.min(.05,(t-last)/1000||0);last=t;if(run)update(dt);render();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+
+function hold(id,on){const b=$(id);const set=v=>e=>{e.preventDefault();on(v);b.classList.toggle("d",!!v)};
+ b.addEventListener("pointerdown",set(1));for(const ev of ["pointerup","pointerleave","pointercancel"])b.addEventListener(ev,set(0));b.addEventListener("contextmenu",e=>e.preventDefault())}
+hold("bl",v=>kl=v);hold("br",v=>kr=v);hold("bb",v=>kb=v);
+const key=v=>e=>{const k=e.key;if(k==="ArrowLeft"||k==="a")kl=v;else if(k==="ArrowRight"||k==="d")kr=v;else if(k==="ArrowDown"||k===" "||k==="s")kb=v;else return;e.preventDefault()};
+addEventListener("keydown",key(1));addEventListener("keyup",key(0));
+</script>
+</body>
+</html>
